@@ -35,6 +35,7 @@ class WebDigger: NSObject {
 	var resultedPages = 0
 	var threadsUsed = 0
 	var stop = true
+	var urlSession: NSURLSession?
 
 	var urlResults: [String: URLSearchResult] = [:]
 
@@ -64,7 +65,7 @@ class WebDigger: NSObject {
 		resultedPages = rp
 
 		if currentResults >= maxResults {
-			self.stop = true
+			stopSearch()
 		}
 
 		while threadsUsed < maxThreads && !self.stop {
@@ -82,7 +83,7 @@ class WebDigger: NSObject {
 			if levelPool.count > 0 {
 				searchWith(levelPool.anyObject() as! String)
 			} else {
-				stop = true
+				stopSearch()
 			}
 		}
 	}
@@ -105,6 +106,8 @@ class WebDigger: NSObject {
 
 	func stopSearch() {
 		stop = true
+		urlSession?.invalidateAndCancel()
+		urlSession = nil
 	}
 
 	func searchWith(urlString: String) {
@@ -126,9 +129,18 @@ class WebDigger: NSObject {
 		urlResults[urlString]?.status = .URLSearchStatusInProgress
 
 		let url: NSURL = NSURL(string: urlString)!
-		let session = NSURLSession.sharedSession()
 
-		let task = session.dataTaskWithURL(url) {
+		if urlSession == nil {
+			let sessionConfig = NSURLSessionConfiguration.defaultSessionConfiguration()
+			sessionConfig.HTTPMaximumConnectionsPerHost = self.maxThreads;
+			sessionConfig.timeoutIntervalForResource = 20;
+			sessionConfig.timeoutIntervalForRequest = 20;
+
+			urlSession = NSURLSession(configuration: sessionConfig)
+
+		}
+
+		let task = urlSession!.dataTaskWithURL(url) {
 			(let data, let response, let error) in
 
 			self.threadsUsed -= 1
