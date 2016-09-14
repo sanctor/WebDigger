@@ -9,25 +9,23 @@
 import UIKit
 import Foundation
 
-let kNOTIFY_RESULTS_UPDATED = "resultsUpdatedNotification"
+let kNOTIFY_RESULTS_UPDATED = NSNotification.Name(rawValue: "resultsUpdatedNotification")
 
 class WebDigger: NSObject {
+    private static let instance : WebDigger = {
+        let instance = WebDigger()
+        return instance
+    }()
+	
 	class var shared: WebDigger {
 		get {
-			struct Static {
-				static var instance: WebDigger? = nil
-				static var token: dispatch_once_t = 0
-			}
-			dispatch_once(&Static.token, {
-				Static.instance = WebDigger()
-			})
-			return Static.instance!
+            return instance;
 		}
 	}
 
 	var searchString: String = "swift"
-	private var urlPools: Array<Set<String>>?
-	private var urlDigged: Set<String>?
+	fileprivate var urlPools: Array<Set<String>>?
+	fileprivate var urlDigged: Set<String>?
 	var maxDepth = 1
 	var maxThreads = 5
 	var maxResults = 100
@@ -35,11 +33,11 @@ class WebDigger: NSObject {
 	var resultedPages = 0
 	var threadsUsed = 0
 	var stop = true
-	var urlSession: NSURLSession?
+	var urlSession: URLSession?
 
 	var urlResults: [String: URLSearchResult] = [:]
 
-	let httpRegex: NSRegularExpression = try! NSRegularExpression.init(pattern: "https?:\\/\\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)", options: .CaseInsensitive)
+	let httpRegex: NSRegularExpression = try! NSRegularExpression.init(pattern: "https?:\\/\\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)", options: .caseInsensitive)
 
 	var searchRegex: NSRegularExpression?
 
@@ -52,10 +50,10 @@ class WebDigger: NSObject {
 	override init() {
 		super.init()
 
-		NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(WebDigger.resultsUpdated(_:)), name: kNOTIFY_RESULTS_UPDATED, object: nil)
+		NotificationCenter.default.addObserver(self, selector: #selector(WebDigger.resultsUpdated(_:)), name: kNOTIFY_RESULTS_UPDATED, object: nil)
 	}
 
-	func resultsUpdated (notification: NSNotification) {
+	func resultsUpdated (_ notification: Notification) {
 		var rs = 0
 		var rp = 0
 
@@ -76,7 +74,7 @@ class WebDigger: NSObject {
 			var curLevel = 0
 
 			var levelPool: Set<String> = []
-			while curLevel < urlPools?.count {
+			while curLevel < (urlPools?.count)! {
 				levelPool = (self.urlPools?[curLevel])!
 				if levelPool.count > 0 {
 					break
@@ -92,7 +90,7 @@ class WebDigger: NSObject {
 		}
 	}
 
-	func startSearchWith(urlString: String) {
+	func startSearchWith(_ urlString: String) {
 		urlResults = [:]
 		urlPools = []
 		urlDigged = []
@@ -100,14 +98,13 @@ class WebDigger: NSObject {
 		currentResults = 0
 		resultedPages = 0
 
-		searchRegex = try! NSRegularExpression.init(pattern: self.searchString, options: .CaseInsensitive)
+		searchRegex = try! NSRegularExpression.init(pattern: self.searchString, options: .caseInsensitive)
 
 		stop = false
-
-		dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), {
+        
+		DispatchQueue.global().async {
 			self.searchWith(urlString);
-		});
-
+		}
 	}
 
 	func stopSearch() {
@@ -116,10 +113,10 @@ class WebDigger: NSObject {
 		urlSession = nil
 	}
 
-	func searchWith(urlString: String) {
+	func searchWith(_ urlString: String) {
 		if stop { return }
 
-		for (index, var urlPool) in (urlPools?.enumerate())! {
+		for (index, var urlPool) in (urlPools?.enumerated())! {
 			urlPool.remove(urlString)
 			urlPools![index] = urlPool
 		}
@@ -132,64 +129,64 @@ class WebDigger: NSObject {
 		if (urlResults[urlString] == nil) {
 			urlResults[urlString] = URLSearchResult(aURLString: urlString)
 		}
-		urlResults[urlString]?.status = .URLSearchStatusInProgress
+		urlResults[urlString]?.status = .urlSearchStatusInProgress
 
-		let url: NSURL = NSURL(string: urlString)!
+		let url: URL = URL(string: urlString)!
 
 		if urlSession == nil {
-			let sessionConfig = NSURLSessionConfiguration.defaultSessionConfiguration()
-			sessionConfig.HTTPMaximumConnectionsPerHost = self.maxThreads;
+			let sessionConfig = URLSessionConfiguration.default
+			sessionConfig.httpMaximumConnectionsPerHost = self.maxThreads;
 			sessionConfig.timeoutIntervalForResource = 20;
 			sessionConfig.timeoutIntervalForRequest = 20;
 
-			urlSession = NSURLSession(configuration: sessionConfig)
+			urlSession = URLSession(configuration: sessionConfig)
 
 		}
 
-		let task = urlSession!.dataTaskWithURL(url) {
-			(let data, let response, let error) in
+		let task = urlSession!.dataTask(with: url, completionHandler: {
+			(data, response, error) in
 
 			self.threadsUsed -= 1
 
 			guard let _ = self.urlResults[urlString] else {
-				NSNotificationCenter.defaultCenter().postNotificationName(kNOTIFY_RESULTS_UPDATED, object: nil)
+				NotificationCenter.default.post(name: kNOTIFY_RESULTS_UPDATED, object: nil)
 				return
 			}
 
 			let resultObject: URLSearchResult = self.urlResults[urlString]!
 
 			if error != nil {
-				resultObject.status = .URLSearchStatusError
+				resultObject.status = .urlSearchStatusError
 				resultObject.statusString = (error?.localizedDescription)!
 
-				NSNotificationCenter.defaultCenter().postNotificationName(kNOTIFY_RESULTS_UPDATED, object: nil)
+				NotificationCenter.default.post(name: kNOTIFY_RESULTS_UPDATED, object: nil)
 				return
 			}
 
-			guard let _: NSData = data, let _: NSURLResponse = response where error == nil else {
-				resultObject.status = .URLSearchStatusError
+			guard let _: Data = data, let _: URLResponse = response , error == nil else {
+				resultObject.status = .urlSearchStatusError
 				resultObject.statusString = (error?.localizedDescription)!
 
-				NSNotificationCenter.defaultCenter().postNotificationName(kNOTIFY_RESULTS_UPDATED, object: nil)
+				NotificationCenter.default.post(name: kNOTIFY_RESULTS_UPDATED, object: nil)
 				return
 			}
 
-			let dataString = String(data: data!, encoding: NSUTF8StringEncoding)
+			let dataString = String(data: data!, encoding: String.Encoding.utf8)
 			if (dataString == nil) {
-				resultObject.status = .URLSearchStatusError
+				resultObject.status = .urlSearchStatusError
 				resultObject.statusString = NSLocalizedString("Cannot convert server response", comment: "")
 
-				NSNotificationCenter.defaultCenter().postNotificationName(kNOTIFY_RESULTS_UPDATED, object: nil)
+				NotificationCenter.default.post(name: kNOTIFY_RESULTS_UPDATED, object: nil)
 				return
 			}
 
-			var matches = self.searchRegex!.matchesInString(dataString!, options: .WithoutAnchoringBounds, range: NSMakeRange(0, (dataString?.characters.count)!))
+			var matches = self.searchRegex!.matches(in: dataString!, options: .withoutAnchoringBounds, range: NSMakeRange(0, (dataString?.characters.count)!))
 
-			resultObject.status = .URLSearchStatusFinished
+			resultObject.status = .urlSearchStatusFinished
 			resultObject.resultsCount = matches.count
 
 			if resultObject.level < self.maxDepth && !self.stop {
-				matches = self.httpRegex.matchesInString(dataString!, options: .WithoutAnchoringBounds, range: NSMakeRange(0, (dataString?.characters.count)!))
+				matches = self.httpRegex.matches(in: dataString!, options: .withoutAnchoringBounds, range: NSMakeRange(0, (dataString?.characters.count)!))
 
 				var levelPool: Set<String> = []
 				let level = resultObject.level
@@ -199,9 +196,9 @@ class WebDigger: NSObject {
 
 				for match in matches {
 					let matchRange = match.range
-					var urlStr = (dataString! as NSString).substringWithRange(matchRange)
+					var urlStr = (dataString! as NSString).substring(with: matchRange)
 					if urlStr.hasSuffix("/") {
-						urlStr = urlStr.substringToIndex(urlStr.endIndex.predecessor())
+						urlStr = urlStr.substring(to: urlStr.characters.index(before: urlStr.endIndex))
 					}
 
 					if self.urlResults[urlStr] == nil {
@@ -219,8 +216,8 @@ class WebDigger: NSObject {
 				}
 			}
 
-			NSNotificationCenter.defaultCenter().postNotificationName(kNOTIFY_RESULTS_UPDATED, object: nil)
-		}
+			NotificationCenter.default.post(name: kNOTIFY_RESULTS_UPDATED, object: nil)
+		}) 
 
 		threadsUsed += 1
 		task.resume()

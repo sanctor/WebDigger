@@ -39,13 +39,13 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
 		threadsLabel.text = "Max threads (\(WebDigger.shared.maxThreads)):"
 		resultsLabel.text = "Max results (\(WebDigger.shared.maxResults)):"
 
-		resultsView.hidden = true
+		resultsView.isHidden = true
 
-		NSNotificationCenter.defaultCenter().addObserver(self, selector: #selector(WebDigger.resultsUpdated(_:)), name: kNOTIFY_RESULTS_UPDATED, object: nil)
+		NotificationCenter.default.addObserver(self, selector: #selector(WebDigger.resultsUpdated(_:)), name: kNOTIFY_RESULTS_UPDATED, object: nil)
 	}
 
-	func resultsUpdated (notification: NSNotification) {
-		dispatch_async(dispatch_get_main_queue(), {
+	func resultsUpdated (_ notification: Notification) {
+		DispatchQueue.main.async(execute: {
 			self.activeThreadsLabel.text = "Threads active: \(WebDigger.shared.threadsUsed)"
 			self.viewedPagesLabel.text = "Pages viewed: \(WebDigger.shared.viewedPages)"
 			self.resultedPagesLabel.text = "Pages with text: \(WebDigger.shared.resultedPages)"
@@ -53,87 +53,87 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
 			self.resultsTable.reloadData()
 
 			if WebDigger.shared.stop && WebDigger.shared.threadsUsed == 0 {
-				self.urlField.enabled = true
-				self.searchField.enabled = true
-				self.btnSearch.setTitle("Search", forState: UIControlState.Normal)
-				UIApplication.sharedApplication().networkActivityIndicatorVisible = false
+				self.urlField.isEnabled = true
+				self.searchField.isEnabled = true
+				self.btnSearch.setTitle("Search", for: UIControlState())
+				UIApplication.shared.isNetworkActivityIndicatorVisible = false
 
-				let alert = UIAlertController(title: "Search finished", message: "Found \(WebDigger.shared.currentResults) occurences of text on \(WebDigger.shared.viewedPages) pages", preferredStyle: UIAlertControllerStyle.Alert)
-				alert.addAction(UIAlertAction(title: "Dismiss", style: UIAlertActionStyle.Default, handler: nil))
+				let alert = UIAlertController(title: "Search finished", message: "Found \(WebDigger.shared.currentResults) occurences of text on \(WebDigger.shared.viewedPages) pages", preferredStyle: UIAlertControllerStyle.alert)
+				alert.addAction(UIAlertAction(title: "Dismiss", style: UIAlertActionStyle.default, handler: nil))
 
-				self.presentViewController(alert, animated: true, completion: nil)
+				self.present(alert, animated: true, completion: nil)
 			}
 		});
 	}
 
-	@IBAction func onSearch(sender: AnyObject) {
+	@IBAction func onSearch(_ sender: AnyObject) {
 		if WebDigger.shared.stop {
-			if urlField.text?.characters.count < 10 {
+			if (urlField.text?.characters.count)! < 10 {
 				urlField.becomeFirstResponder()
 				return
 			}
 
-			if searchField.text?.characters.count < 3 {
+			if (searchField.text?.characters.count)! < 3 {
 				searchField.becomeFirstResponder()
 				return
 			}
 
-			UIApplication.sharedApplication().networkActivityIndicatorVisible = true
+			UIApplication.shared.isNetworkActivityIndicatorVisible = true
 
 			WebDigger.shared.searchString = searchField.text!
 			WebDigger.shared.startSearchWith(urlField.text!)
 
-			resultsView.hidden = false
-			urlField.enabled = false
-			searchField.enabled = false
-			btnSearch.setTitle("Stop", forState: UIControlState.Normal)
+			resultsView.isHidden = false
+			urlField.isEnabled = false
+			searchField.isEnabled = false
+			btnSearch.setTitle("Stop", for: UIControlState())
 
 			self.resultsTable.reloadData()
 
 		} else {
-			UIApplication.sharedApplication().networkActivityIndicatorVisible = false
+			UIApplication.shared.isNetworkActivityIndicatorVisible = false
 
-			urlField.enabled = true
-			searchField.enabled = true
+			urlField.isEnabled = true
+			searchField.isEnabled = true
 
 			WebDigger.shared.stopSearch()
-			btnSearch.setTitle("Search", forState: UIControlState.Normal)
+			btnSearch.setTitle("Search", for: UIControlState())
 		}
 
 	}
-	@IBAction func depthChanged(sender: AnyObject) {
+	@IBAction func depthChanged(_ sender: AnyObject) {
 		let slider: UISlider = sender as! UISlider
 		WebDigger.shared.maxDepth = Int(slider.value)
 		depthLabel.text = "Search depth (\(WebDigger.shared.maxDepth)):"
 	}
 
-	@IBAction func maxThreadsChanged(sender: AnyObject) {
+	@IBAction func maxThreadsChanged(_ sender: AnyObject) {
 		let slider: UISlider = sender as! UISlider
 		WebDigger.shared.maxThreads = Int(slider.value)
 		threadsLabel.text = "Max threads (\(WebDigger.shared.maxThreads)):"
 	}
 
-	@IBAction func maxResultsChanged(sender: AnyObject) {
+	@IBAction func maxResultsChanged(_ sender: AnyObject) {
 		let slider: UISlider = sender as! UISlider
 		WebDigger.shared.maxResults = Int(slider.value)
 		resultsLabel.text = "Max results (\(WebDigger.shared.maxResults)):"
 	}
 
-	@IBAction func resultsTapped(sender: AnyObject) {
+	@IBAction func resultsTapped(_ sender: AnyObject) {
 		if WebDigger.shared.stop {
-			resultsView.hidden = true
+			resultsView.isHidden = true
 		}
 	}
 
 // MARK: Text field delegate
 
-	func textFieldShouldReturn(textField: UITextField) -> Bool {
-		if urlField.text?.characters.count < 10 {
+	func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+		if (urlField.text?.characters.count)! < 10 {
 			urlField.becomeFirstResponder()
 			return true
 		}
 
-		if searchField.text?.characters.count < 3 {
+		if (searchField.text?.characters.count)! < 3 {
 			searchField.becomeFirstResponder()
 			return true
 		}
@@ -145,37 +145,37 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
 
 // MARK: Table Delegate
 
-	func numberOfSectionsInTableView(tableView: UITableView) -> Int {
+	func numberOfSections(in tableView: UITableView) -> Int {
 		return 1
 	}
 
-	func tableView(tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+	func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
 		return WebDigger.shared.urlResults.values.count
 	}
 
-	func tableView(tableView: UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
-		var cell = tableView.dequeueReusableCellWithIdentifier("resultCell")
+	func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+		var cell = tableView.dequeueReusableCell(withIdentifier: "resultCell")
 		if cell == nil {
-			cell = UITableViewCell(style: UITableViewCellStyle.Subtitle, reuseIdentifier: "resultCell")
+			cell = UITableViewCell(style: UITableViewCellStyle.subtitle, reuseIdentifier: "resultCell")
 		}
 
-		let result: URLSearchResult = Array(WebDigger.shared.urlResults.values)[indexPath.row]
+		let result: URLSearchResult = Array(WebDigger.shared.urlResults.values)[(indexPath as NSIndexPath).row]
 		switch result.status {
-		case .URLSearchStatusFinished:
+		case .urlSearchStatusFinished:
 			let img = UIImageView.init(image: UIImage.init(named: "checkmark"))
-			img.tintColor = result.resultsCount > 0 ? UIColor.greenColor() : UIColor.orangeColor()
+			img.tintColor = result.resultsCount > 0 ? UIColor.green : UIColor.orange
 			cell?.accessoryView = img
-		case .URLSearchStatusInProgress:
-			let activity = UIActivityIndicatorView(activityIndicatorStyle: UIActivityIndicatorViewStyle.Gray)
+		case .urlSearchStatusInProgress:
+			let activity = UIActivityIndicatorView(activityIndicatorStyle: UIActivityIndicatorViewStyle.gray)
 			activity.startAnimating()
 			cell?.accessoryView = activity
-		case .URLSearchStatusError:
+		case .urlSearchStatusError:
 			let img = UIImageView.init(image: UIImage.init(named: "error"))
-			img.tintColor = UIColor.redColor()
+			img.tintColor = UIColor.red
 			cell?.accessoryView = img
 		default:
 			let img = UIImageView.init(image: UIImage.init(named: "delay"))
-			img.tintColor = UIColor.darkGrayColor()
+			img.tintColor = UIColor.darkGray
 			cell?.accessoryView = img
 		}
 		cell?.textLabel?.text = result.urlString
@@ -188,9 +188,9 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
 		return cell!
 	}
 
-	func tableView(tableView: UITableView, didSelectRowAtIndexPath indexPath: NSIndexPath) {
-		let result: URLSearchResult = Array(WebDigger.shared.urlResults.values)[indexPath.row]
-		UIPasteboard.generalPasteboard().string = result.urlString
+	func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+		let result: URLSearchResult = Array(WebDigger.shared.urlResults.values)[(indexPath as NSIndexPath).row]
+		UIPasteboard.general.string = result.urlString
 	}
 }
 

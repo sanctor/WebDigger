@@ -9,17 +9,17 @@
 import UIKit
 
 enum URLSearchStatus {
-	case URLSearchStatusAdded
-	case URLSearchStatusInProgress
-	case URLSearchStatusFinished
-	case URLSearchStatusError
+	case urlSearchStatusAdded
+	case urlSearchStatusInProgress
+	case urlSearchStatusFinished
+	case urlSearchStatusError
 }
 
 class URLSearchResult: NSObject {
 	var urlString: String = "";
 	var level: Int = 0
 	var resultsCount: Int = 0
-	var status: URLSearchStatus = .URLSearchStatusAdded
+	var status: URLSearchStatus = .urlSearchStatusAdded
 	var statusString: String = ""
 
 	init(aURLString: String) {
