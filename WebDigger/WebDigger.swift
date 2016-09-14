@@ -26,8 +26,8 @@ class WebDigger: NSObject {
 	}
 
 	var searchString: String = "swift"
-	private var urlPools: Array<NSMutableSet> = []
-	private var urlDigged: NSMutableSet = []
+	private var urlPools: Array<Set<String>>?
+	private var urlDigged: Set<String>?
 	var maxDepth = 1
 	var maxThreads = 5
 	var maxResults = 100
@@ -39,9 +39,13 @@ class WebDigger: NSObject {
 
 	var urlResults: [String: URLSearchResult] = [:]
 
+	let httpRegex: NSRegularExpression = try! NSRegularExpression.init(pattern: "https?:\\/\\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)", options: .CaseInsensitive)
+
+	var searchRegex: NSRegularExpression?
+
 	var viewedPages: Int {
 		get {
-			return urlDigged.count
+			return (urlDigged?.count)!
 		}
 	}
 
@@ -71,9 +75,9 @@ class WebDigger: NSObject {
 		while threadsUsed < maxThreads && !self.stop {
 			var curLevel = 0
 
-			var levelPool: NSMutableSet = []
-			while curLevel < urlPools.count {
-				levelPool = self.urlPools[curLevel]
+			var levelPool: Set<String> = []
+			while curLevel < urlPools?.count {
+				levelPool = (self.urlPools?[curLevel])!
 				if levelPool.count > 0 {
 					break
 				}
@@ -81,7 +85,7 @@ class WebDigger: NSObject {
 			}
 
 			if levelPool.count > 0 {
-				searchWith(levelPool.anyObject() as! String)
+				searchWith(levelPool.first!)
 			} else {
 				stopSearch()
 			}
@@ -95,6 +99,8 @@ class WebDigger: NSObject {
 		threadsUsed = 0
 		currentResults = 0
 		resultedPages = 0
+
+		searchRegex = try! NSRegularExpression.init(pattern: self.searchString, options: .CaseInsensitive)
 
 		stop = false
 
@@ -113,16 +119,16 @@ class WebDigger: NSObject {
 	func searchWith(urlString: String) {
 		if stop { return }
 
-		for urlPool in urlPools {
-			urlPool.removeObject(urlString)
+		for (index, var urlPool) in (urlPools?.enumerate())! {
+			urlPool.remove(urlString)
+			urlPools![index] = urlPool
 		}
 
-		guard !urlDigged.containsObject(urlString) else {
-			NSNotificationCenter.defaultCenter().postNotificationName(kNOTIFY_RESULTS_UPDATED, object: nil)
+		guard !(urlDigged?.contains(urlString))! else {
 			return
 		}
 
-		urlDigged.addObject(urlString)
+		urlDigged?.insert(urlString)
 		if (urlResults[urlString] == nil) {
 			urlResults[urlString] = URLSearchResult(aURLString: urlString)
 		}
@@ -177,24 +183,18 @@ class WebDigger: NSObject {
 				return
 			}
 
-			var pattern = self.searchString
-			var regex = try! NSRegularExpression.init(pattern: pattern, options: .CaseInsensitive)
-			var matches = regex.matchesInString(dataString!, options: .WithoutAnchoringBounds, range: NSMakeRange(0, (dataString?.characters.count)!))
+			var matches = self.searchRegex!.matchesInString(dataString!, options: .WithoutAnchoringBounds, range: NSMakeRange(0, (dataString?.characters.count)!))
 
 			resultObject.status = .URLSearchStatusFinished
 			resultObject.resultsCount = matches.count
 
 			if resultObject.level < self.maxDepth && !self.stop {
-				pattern = "https?:\\/\\/(www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\\.[a-z]{2,6}\\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)"
-				regex = try! NSRegularExpression.init(pattern: pattern, options: .CaseInsensitive)
-				matches = regex.matchesInString(dataString!, options: .WithoutAnchoringBounds, range: NSMakeRange(0, (dataString?.characters.count)!))
+				matches = self.httpRegex.matchesInString(dataString!, options: .WithoutAnchoringBounds, range: NSMakeRange(0, (dataString?.characters.count)!))
 
-				var levelPool: NSMutableSet = []
+				var levelPool: Set<String> = []
 				let level = resultObject.level
-				if self.urlPools.count > level {
-					levelPool = self.urlPools[level]
-				} else {
-					self.urlPools.append(levelPool)
+				if self.urlPools!.count > level {
+					levelPool = self.urlPools![level]
 				}
 
 				for match in matches {
@@ -209,14 +209,17 @@ class WebDigger: NSObject {
 						searchResult.level = level + 1
 						self.urlResults[urlStr] = searchResult
 
-						levelPool.addObject(urlStr)
+						levelPool.insert(urlStr)
 					}
 				}
-
+				if self.urlPools!.count > level {
+					self.urlPools![level] = levelPool
+				} else {
+					self.urlPools?.append(levelPool)
+				}
 			}
 
 			NSNotificationCenter.defaultCenter().postNotificationName(kNOTIFY_RESULTS_UPDATED, object: nil)
-
 		}
 
 		threadsUsed += 1

@@ -52,7 +52,7 @@ class ViewController: UIViewController, UITableViewDelegate, UITableViewDataSour
 
 			self.resultsTable.reloadData()
 
-			if WebDigger.shared.stop {
+			if WebDigger.shared.stop && WebDigger.shared.threadsUsed == 0 {
 				self.urlField.enabled = true
 				self.searchField.enabled = true
 				self.btnSearch.setTitle("Search", forState: UIControlState.Normal)
